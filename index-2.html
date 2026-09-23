@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Availability</title>
+<title>Gravix's Availability</title>
 <style>
   :root {
     --ink: #1c2430; --muted: #6b7480; --line: #dfe3e8; --paper: #ffffff;
@@ -15,9 +15,10 @@
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
   h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
-  .intro { color: var(--muted); margin: 0 0 24px; font-size: 15px; }
+  .intro { color: var(--muted); margin: 0 0 8px; font-size: 15px; }
   h2 { font-size: 17px; font-weight: 600; margin: 28px 0 8px; padding-bottom: 6px;
     border-bottom: 2px solid var(--ink); }
+  .month:first-child h2 { margin-top: 4px; }
   .empty { color: var(--muted); padding: 12px 0; }
   .event { display: grid; grid-template-columns: 56px 1fr; gap: 12px;
     padding: 14px 0; border-bottom: 1px solid var(--line); }
@@ -31,6 +32,7 @@
   .slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   .slot { border-radius: 999px; padding: 7px 14px; font-size: 14px; border: 1.5px solid transparent;
     font-family: inherit; line-height: 1.2; }
+  .slot b { font-weight: 600; }
   button.slot.open { background: var(--open-soft); border-color: var(--open); color: var(--open); cursor: pointer; }
   button.slot.open:hover, button.slot.open:focus-visible { background: var(--open); color: #fff; outline: none; }
   .slot.taken { background: var(--taken); color: var(--muted); }
@@ -47,6 +49,11 @@
   .btn { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; }
   .btn.primary { background: var(--open); border-color: var(--open); color: #fff; }
   .btn:disabled { opacity: .6; cursor: default; }
+  .btn.busy { position: relative; color: transparent; }
+  .btn.busy::after { content: ""; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px;
+    margin: -8px 0 0 -8px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+    border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .error { color: #a3261f; font-size: 14px; margin-top: 8px; min-height: 1.2em; }
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: #fff;
     padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -86,12 +93,12 @@
     main, .month, .month .event { animation: none; }
     .month { grid-template-rows: 1fr; }
   }
-  .stale { color: var(--muted); font-size: 12px; margin-top: -16px; margin-bottom: 16px; min-height: 1.2em; }
+  .stale { color: var(--muted); font-size: 12px; margin: 0; min-height: 1.2em; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Availability</h1>
+  <h1>Gravix's Availability</h1>
   <p class="intro">Tap an open slot to claim it. You'll be asked for your name.</p>
   <div id="status" class="stale"></div>
   <div id="schedule"></div>
@@ -120,9 +127,10 @@
   const dialog = $('claimDialog');
   let pending = null;
 
-  // Give up on a single attempt after this long; the schedule load retries.
-  const TIMEOUT_MS = 6000;
-  const LOAD_ATTEMPTS = 3;
+  // Give up on a single attempt after this long; the schedule load retries once.
+  // Apps Script cold starts can take several seconds, so keep this generous.
+  const TIMEOUT_MS = 12000;
+  const LOAD_ATTEMPTS = 2;
 
   async function fetchWithTimeout(url, opts, ms) {
     const ctrl = new AbortController();
@@ -149,9 +157,14 @@
       try { return await api(); }
       catch (err) {
         lastErr = err;
-        if (i < LOAD_ATTEMPTS - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
+        // Only retry timeouts and network failures; a server-side error won't
+        // change on a retry.
+        const transient = err.name === 'AbortError' || err.name === 'TypeError';
+        if (!transient || i === LOAD_ATTEMPTS - 1) break;
+        await new Promise(r => setTimeout(r, 750));
       }
     }
+    console.error('Schedule load failed:', lastErr);
     throw lastErr;
   }
 
@@ -179,8 +192,8 @@
         const slots = !ev.available
           ? '<div class="not-going">Not going</div>'
           : '<div class="slots">' + ev.slots.map(s => s.claimed
-              ? `<span class="slot taken">Claimed</span>`
-              : `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}">Open</button>`
+              ? `<span class="slot taken"><b>Slot ${s.index + 1}</b> · Claimed</span>`
+              : `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}"><b>Slot ${s.index + 1}</b> · Open</button>`
             ).join('') + '</div>';
         html += `
           <div class="event${sameDay ? ' same-day' : ''}" style="--i:${mi};--j:${Math.min(ei, 8)}">
@@ -272,9 +285,10 @@
     if (!btn) return;
     pending = { eventId: btn.dataset.event, slotIndex: +btn.dataset.slot };
     const ev = btn.closest('.event');
-    $('claimCtx').textContent = ev.querySelector('.title').textContent + ' — slot ' + (pending.slotIndex + 1);
+    $('claimCtx').textContent = ev.querySelector('.title').textContent + ' — Slot ' + (pending.slotIndex + 1);
     $('claimError').textContent = '';
     $('claimBtn').disabled = false;
+    $('claimBtn').classList.remove('busy');
     dialog.showModal();
     $('nameInput').focus();
   });
@@ -284,21 +298,28 @@
     const name = $('nameInput').value.trim();
     if (!name) { $('claimError').textContent = 'Enter your name to claim a slot.'; return; }
     $('claimBtn').disabled = true;
+    $('claimBtn').classList.add('busy');
     $('claimError').textContent = '';
-    // Longer timeout for the write, and no automatic retry: if the request went
-    // through but the reply was lost, retrying would just report the slot as taken.
-    api({ action: 'claim', eventId: pending.eventId, slotIndex: pending.slotIndex, name }, 15000)
+    // The claimId makes the request idempotent, so a timed-out claim can be
+    // retried safely: the server recognises the id and confirms rather than
+    // reporting the slot as taken.
+    const claim = { action: 'claim', eventId: pending.eventId, slotIndex: pending.slotIndex, name,
+      claimId: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()) };
+    (async () => {
+      let lastErr;
+      for (let i = 0; i < 3; i++) {
+        try { return await api(claim, 20000); }
+        catch (err) {
+          lastErr = err;
+          if (!(err.name === 'AbortError' || err.name === 'TypeError')) throw err;
+        }
+      }
+      throw lastErr;
+    })()
       .then(data => { dialog.close(); renderFresh(data); toast('Slot claimed'); })
       .catch(err => {
         $('claimBtn').disabled = false;
+        $('claimBtn').classList.remove('busy');
         $('claimError').textContent = err.name === 'AbortError'
           ? 'That took too long. Check the schedule and try again if the slot is still open.'
-          : (err.message || 'Could not claim that slot.');
-        load();
-      });
-  });
-
-  boot();
-</script>
-</body>
-</html>
+          : (err.message || 'Could not
