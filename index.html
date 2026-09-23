@@ -2,32 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Availability</title>
 <style>
   :root {
-    --ink: #1c2430;
-    --muted: #6b7480;
-    --line: #dfe3e8;
-    --paper: #ffffff;
-    --wash: #f4f6f8;
-    --open: #1f6f43;
-    --open-soft: #e6f2ea;
-    --taken: #e4e7eb;
+    --ink: #1c2430; --muted: #6b7480; --line: #dfe3e8; --paper: #ffffff;
+    --open: #1f6f43; --open-soft: #e6f2ea; --taken: #e4e7eb;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; background: var(--paper); color: var(--ink);
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
   h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
   .intro { color: var(--muted); margin: 0 0 24px; font-size: 15px; }
-  .owner-badge { display: inline-block; background: var(--ink); color: #fff;
-    font-size: 12px; padding: 2px 8px; border-radius: 4px; vertical-align: middle; margin-left: 8px; }
-  [hidden] { display: none !important; }
-
   h2 { font-size: 17px; font-weight: 600; margin: 28px 0 8px; padding-bottom: 6px;
     border-bottom: 2px solid var(--ink); }
   .empty { color: var(--muted); padding: 12px 0; }
-
   .event { display: grid; grid-template-columns: 56px 1fr; gap: 12px;
     padding: 14px 0; border-bottom: 1px solid var(--line); }
   .event.same-day { padding-top: 0; border-top: 0; }
@@ -37,46 +28,73 @@
   .day .dow { display: block; font-size: 12px; color: var(--muted); }
   .title { font-weight: 600; }
   .type { color: var(--muted); font-size: 14px; }
-
   .slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   .slot { border-radius: 999px; padding: 7px 14px; font-size: 14px; border: 1.5px solid transparent;
     font-family: inherit; line-height: 1.2; }
-  button.slot.open { background: var(--open-soft); border-color: var(--open); color: var(--open);
-    cursor: pointer; }
+  button.slot.open { background: var(--open-soft); border-color: var(--open); color: var(--open); cursor: pointer; }
   button.slot.open:hover, button.slot.open:focus-visible { background: var(--open); color: #fff; outline: none; }
   .slot.taken { background: var(--taken); color: var(--muted); }
-  .slot.taken.named { color: var(--ink); display: inline-flex; align-items: center; gap: 8px; padding-right: 8px; }
-  .slot .free { font: inherit; font-size: 12px; border: 0; background: transparent; color: var(--muted);
-    cursor: pointer; padding: 0 2px; text-decoration: underline; }
-  .slot .free:hover, .slot .free:focus-visible { color: #a3261f; outline: none; }
   .not-going { color: var(--muted); font-size: 14px; margin-top: 6px; font-style: italic; }
-
   dialog { border: 0; border-radius: 12px; padding: 20px; width: min(92vw, 360px);
     box-shadow: 0 12px 40px rgba(28,36,48,.25); }
   dialog::backdrop { background: rgba(28,36,48,.4); }
   dialog p { margin: 0 0 12px; }
   dialog .ctx { color: var(--muted); font-size: 14px; }
   label { display: block; font-size: 14px; margin-bottom: 6px; }
-  input[type=text] { width: 100%; font: inherit; padding: 10px 12px; border: 1.5px solid var(--line);
-    border-radius: 8px; }
+  input[type=text] { width: 100%; font: inherit; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 8px; }
   input[type=text]:focus { outline: none; border-color: var(--ink); }
   .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-  .btn { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1.5px solid var(--line);
-    background: var(--paper); cursor: pointer; }
+  .btn { font: inherit; padding: 9px 16px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; }
   .btn.primary { background: var(--open); border-color: var(--open); color: #fff; }
   .btn:disabled { opacity: .6; cursor: default; }
   .error { color: #a3261f; font-size: 14px; margin-top: 8px; min-height: 1.2em; }
-  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
-    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 14px;
-    opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: #fff;
+    padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: 1; }
+
+  /* Skeleton placeholders shown until the schedule arrives */
+  .sk { background: linear-gradient(90deg, #eceef1 25%, #f6f7f9 50%, #eceef1 75%);
+    background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; border-radius: 6px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .sk-day { width: 30px; height: 26px; margin: 0 auto 4px; }
+  .sk-dow { width: 24px; height: 10px; margin: 0 auto; }
+  .sk-title { width: 55%; height: 15px; margin-bottom: 8px; }
+  .sk-type { width: 30%; height: 12px; margin-bottom: 10px; }
+  .sk-slot { width: 62px; height: 30px; border-radius: 999px; }
+  /* --- CRT-style open: a line at mid-screen expands to the full page ------ */
+  @keyframes crt-on {
+    0%   { clip-path: inset(50% 0 50% 0); }
+    100% { clip-path: inset(0 0 0 0); }
+  }
+  main { animation: crt-on .5s cubic-bezier(.3,.9,.2,1) both; }
+
+  /* --- Accordion: months unfold one after another ------------------------ */
+  .month { display: grid; grid-template-rows: 0fr; overflow: hidden;
+    animation: unfold .5s cubic-bezier(.2,.8,.2,1) both;
+    animation-delay: calc(.45s + var(--i, 0) * 140ms); }
+  .month > .inner { min-height: 0; }
+  @keyframes unfold { to { grid-template-rows: 1fr; } }
+  .month .event { animation: rise .4s ease both; animation-delay: calc(.6s + var(--i, 0) * 140ms + var(--j, 0) * 50ms); }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  /* Later renders (data replacing skeleton, after a claim) just cross-fade. */
+  #schedule.swap .month { animation: none; grid-template-rows: 1fr; }
+  #schedule.swap .month .event { animation: fadein .3s ease both; animation-delay: 0s; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    main, .month, .month .event { animation: none; }
+    .month { grid-template-rows: 1fr; }
+  }
+  .stale { color: var(--muted); font-size: 12px; margin-top: -16px; margin-bottom: 16px; min-height: 1.2em; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Availability<span id="ownerBadge" class="owner-badge" hidden>Owner view</span></h1>
+  <h1>Availability</h1>
   <p class="intro">Tap an open slot to claim it. You'll be asked for your name.</p>
-  <div id="schedule" class="empty">Loading…</div>
+  <div id="status" class="stale"></div>
+  <div id="schedule"></div>
 </main>
 
 <dialog id="claimDialog">
@@ -91,80 +109,81 @@
 </dialog>
 <div id="toast" class="toast"></div>
 
+<script src="config.js"></script>
 <script>
-  // When this file is hosted outside Apps Script (e.g. GitHub Pages), set this to
-  // the PUBLIC deployment's /exec URL. Ignored when served by Apps Script itself.
-  const API_URL = 'https://script.google.com/macros/s/AKfycbytQgU8ZmaMQogUrOX7-Ie3seuAXrt6SdQHdAhbI6YGa4t3sjlBXjstgqIkSBjt_1UOqw/exec';
-
-  // Same three calls whether we're inside Apps Script or on a static host.
-  const inAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
-  const api = inAppsScript ? {
-    call: (fn, ...args) => new Promise((res, rej) =>
-      google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args)),
-  } : {
-    call: async (fn, ...args) => {
-      let r;
-      if (fn === 'getSchedule') {
-        r = await fetch(API_URL + '?api=schedule', { redirect: 'follow' });
-      } else if (fn === 'claimSlot') {
-        // No custom headers: keeps the request "simple" so Apps Script needs no CORS preflight.
-        r = await fetch(API_URL, { method: 'POST', redirect: 'follow',
-          body: JSON.stringify({ action: 'claim', eventId: args[0], slotIndex: args[1], name: args[2] }) });
-      } else {
-        throw new Error('Not available on the public page.');
-      }
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      return data;
-    },
-  };
+  const { API_URL } = window.SCHEDULER_CONFIG || {};
 
   const MONTHS = ['January','February','March','April','May','June','July','August',
                   'September','October','November','December'];
   const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let pending = null; // { eventId, slotIndex }
-
   const $ = id => document.getElementById(id);
   const dialog = $('claimDialog');
+  let pending = null;
 
-  function monthLabel(ym) {
-    const [y, m] = ym.split('-');
-    return MONTHS[+m - 1] + ' ' + y;
+  // Give up on a single attempt after this long; the schedule load retries.
+  const TIMEOUT_MS = 6000;
+  const LOAD_ATTEMPTS = 3;
+
+  async function fetchWithTimeout(url, opts, ms) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try { return await fetch(url, Object.assign({ signal: ctrl.signal }, opts)); }
+    finally { clearTimeout(t); }
   }
+
+  async function api(body, timeoutMs = TIMEOUT_MS) {
+    // No custom headers: keeps the request "simple", so Apps Script needs no CORS preflight.
+    const r = body
+      ? await fetchWithTimeout(API_URL, { method: 'POST', redirect: 'follow', body: JSON.stringify(body) }, timeoutMs)
+      : await fetchWithTimeout(API_URL + '?api=schedule', { redirect: 'follow' }, timeoutMs);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+
+  // Loading the schedule is read-only, so it's safe to retry on timeouts or
+  // network hiccups. Claims are not retried automatically (see claimBtn).
+  async function loadSchedule() {
+    let lastErr;
+    for (let i = 0; i < LOAD_ATTEMPTS; i++) {
+      try { return await api(); }
+      catch (err) {
+        lastErr = err;
+        if (i < LOAD_ATTEMPTS - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
+      }
+    }
+    throw lastErr;
+  }
+
+  const esc = s => String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const monthLabel = ym => MONTHS[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
   function dateParts(d) {
     const [y, m, day] = d.split('-').map(Number);
     return { num: day, dow: DOWS[new Date(y, m - 1, day).getDay()] };
   }
-  function esc(s) { return String(s).replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  let rendered = false;
 
   function render(data) {
-    $('ownerBadge').hidden = !data.isOwner;
     let html = '';
-    data.months.forEach(ym => {
-      html += `<h2>${monthLabel(ym)}</h2>`;
+    data.months.forEach((ym, mi) => {
+      html += `<section class="month" style="--i:${mi}"><div class="inner"><h2>${monthLabel(ym)}</h2>`;
       const evs = data.events.filter(e => e.date.startsWith(ym));
-      if (!evs.length) { html += '<div class="empty">Nothing scheduled.</div>'; return; }
+      if (!evs.length) { html += '<div class="empty">Nothing scheduled.</div></div></section>'; return; }
       let prevDate = null;
-      evs.forEach(ev => {
+      evs.forEach((ev, ei) => {
         const p = dateParts(ev.date);
         const sameDay = ev.date === prevDate;
         prevDate = ev.date;
-        let slots = '';
-        if (!ev.available) {
-          slots = '<div class="not-going">Not going</div>';
-        } else {
-          slots = '<div class="slots">' + ev.slots.map(s => {
-            if (!s.claimed) {
-              return `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}">Open</button>`;
-            }
-            return s.name
-              ? `<span class="slot taken named">${esc(s.name)} <button class="free" type="button" data-free="${esc(ev.id)}" data-slot="${s.index}" aria-label="Free slot ${s.index + 1} claimed by ${esc(s.name)}">free</button></span>`
-              : `<span class="slot taken">Claimed</span>`;
-          }).join('') + '</div>';
-        }
+        const slots = !ev.available
+          ? '<div class="not-going">Not going</div>'
+          : '<div class="slots">' + ev.slots.map(s => s.claimed
+              ? `<span class="slot taken">Claimed</span>`
+              : `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}">Open</button>`
+            ).join('') + '</div>';
         html += `
-          <div class="event${sameDay ? ' same-day' : ''}">
+          <div class="event${sameDay ? ' same-day' : ''}" style="--i:${mi};--j:${Math.min(ei, 8)}">
             <div class="day"><span class="num">${p.num}</span><span class="dow">${p.dow}</span></div>
             <div>
               <div class="title">${esc(ev.title)}</div>
@@ -173,39 +192,82 @@
             </div>
           </div>`;
       });
+      html += '</div></section>';
     });
     const el = $('schedule');
-    el.className = '';
+    el.className = rendered ? 'swap' : '';
     el.innerHTML = html;
+    rendered = true;
   }
 
-  function showError(msg) {
-    $('schedule').className = 'empty';
-    $('schedule').textContent = msg;
+  function showError(msg) { $('schedule').className = 'empty'; $('schedule').textContent = msg; }
+
+  // --- Perceived speed: skeleton + last-known snapshot ------------------------
+  const SNAP_KEY = 'schedule-snapshot';
+  const MONTHS_GUESS = 4; // only for the skeleton; real months come from the server
+
+  function skeleton() {
+    const now = new Date();
+    let html = '';
+    for (let i = 0; i < MONTHS_GUESS; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      html += `<section class="month" style="--i:${i}"><div class="inner"><h2>${MONTHS[d.getMonth()]} ${d.getFullYear()}</h2>`;
+      for (let r = 0; r < (i === 0 ? 2 : 1); r++) {
+        html += `
+          <div class="event" aria-hidden="true" style="--i:${i};--j:${r}">
+            <div class="day"><div class="sk sk-day"></div><div class="sk sk-dow"></div></div>
+            <div>
+              <div class="sk sk-title"></div>
+              <div class="sk sk-type"></div>
+              <div class="slots"><div class="sk sk-slot"></div><div class="sk sk-slot"></div></div>
+            </div>
+          </div>`;
+      }
+      html += '</div></section>';
+    }
+    $('schedule').className = '';
+    $('schedule').innerHTML = html;
+    rendered = true;
+  }
+
+  function readSnapshot() {
+    try {
+      const raw = localStorage.getItem(SNAP_KEY);
+      if (!raw) return null;
+      const snap = JSON.parse(raw);
+      // Ignore anything older than a week; it would mostly be past events.
+      return (Date.now() - snap.at < 7 * 864e5) ? snap.data : null;
+    } catch (e) { return null; }
+  }
+  function writeSnapshot(data) {
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify({ at: Date.now(), data })); } catch (e) {}
+  }
+
+  function renderFresh(data) {
+    writeSnapshot(data);
+    render(data);
+    $('status').textContent = '';
   }
 
   function load() {
-    api.call('getSchedule').then(render)
-      .catch(() => showError('Could not load the schedule. Refresh to try again.'));
+    loadSchedule().then(renderFresh).catch(() => {
+      if (readSnapshot()) $('status').textContent = "Couldn't refresh — showing the last known schedule.";
+      else showError('Could not load the schedule. Refresh to try again.');
+    });
   }
 
+  function boot() {
+    const snap = readSnapshot();
+    if (snap) { render(snap); $('status').textContent = 'Updating…'; }
+    else skeleton();
+    load();
+  }
   function toast(msg) {
-    const t = $('toast');
-    t.textContent = msg; t.classList.add('show');
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
   }
 
   $('schedule').addEventListener('click', e => {
-    const freeBtn = e.target.closest('button[data-free]');
-    if (freeBtn) {
-      const who = freeBtn.parentElement.textContent.replace(/\s*free\s*$/, '').trim();
-      if (!confirm(`Free the slot claimed by ${who}?`)) return;
-      freeBtn.disabled = true;
-      api.call('freeSlot', freeBtn.dataset.free, +freeBtn.dataset.slot)
-        .then(() => { load(); toast('Slot freed'); })
-        .catch(err => { freeBtn.disabled = false; alert(err.message || 'Could not free the slot.'); });
-      return;
-    }
     const btn = e.target.closest('button.slot.open');
     if (!btn) return;
     pending = { eventId: btn.dataset.event, slotIndex: +btn.dataset.slot };
@@ -216,25 +278,27 @@
     dialog.showModal();
     $('nameInput').focus();
   });
-
   $('cancelBtn').addEventListener('click', () => dialog.close());
   $('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('claimBtn').click(); });
-
   $('claimBtn').addEventListener('click', () => {
     const name = $('nameInput').value.trim();
     if (!name) { $('claimError').textContent = 'Enter your name to claim a slot.'; return; }
     $('claimBtn').disabled = true;
     $('claimError').textContent = '';
-    api.call('claimSlot', pending.eventId, pending.slotIndex, name)
-      .then(data => { dialog.close(); render(data); toast('Slot claimed'); })
+    // Longer timeout for the write, and no automatic retry: if the request went
+    // through but the reply was lost, retrying would just report the slot as taken.
+    api({ action: 'claim', eventId: pending.eventId, slotIndex: pending.slotIndex, name }, 15000)
+      .then(data => { dialog.close(); renderFresh(data); toast('Slot claimed'); })
       .catch(err => {
         $('claimBtn').disabled = false;
-        $('claimError').textContent = (err && err.message) || 'Could not claim that slot.';
-        load(); // refresh in case someone else took it
+        $('claimError').textContent = err.name === 'AbortError'
+          ? 'That took too long. Check the schedule and try again if the slot is still open.'
+          : (err.message || 'Could not claim that slot.');
+        load();
       });
   });
 
-  load();
+  boot();
 </script>
 </body>
 </html>
