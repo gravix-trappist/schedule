@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin</title>
+<style>
+  :root { --ink:#1c2430; --muted:#6b7480; --line:#dfe3e8; --paper:#fff; --wash:#f4f6f8; --open:#1f6f43; --err:#a3261f; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  html, body { margin:0; background:var(--paper); color:var(--ink);
+    font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:22px; font-weight:600; margin:0 0 4px; }
+  h2 { font-size:17px; font-weight:600; margin:28px 0 8px; padding-bottom:6px; border-bottom:2px solid var(--ink); }
+  h3.month { font-size:15px; font-weight:600; margin:18px 0 4px; color:var(--muted); }
+  p.hint { color:var(--muted); font-size:14px; margin:0 0 10px; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+  .who { font-size:13px; color:var(--muted); }
+  textarea { width:100%; min-height:160px; font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;
+    padding:10px; border:1.5px solid var(--line); border-radius:8px; resize:vertical; }
+  textarea:focus { outline:none; border-color:var(--ink); }
+  .btn { font:inherit; padding:9px 16px; border-radius:8px; border:1.5px solid var(--line); background:var(--paper); cursor:pointer; }
+  .btn.primary { background:var(--open); border-color:var(--open); color:#fff; }
+  .btn.small { padding:5px 10px; font-size:13px; }
+  .btn.link { border:0; padding:0; text-decoration:underline; color:var(--muted); font-size:13px; }
+  .btn:disabled { opacity:.6; cursor:default; }
+  .result { margin-top:10px; font-size:14px; min-height:1.2em; }
+  .result.err { color:var(--err); }
+  .result ul { margin:4px 0 0 18px; padding:0; }
+  .event { display:grid; grid-template-columns:56px 1fr auto; gap:12px; align-items:center;
+    padding:12px 0; border-bottom:1px solid var(--line); }
+  .event.off .title, .event.off .meta { color:var(--muted); }
+  .day { text-align:center; line-height:1.1; }
+  .day .num { display:block; font-size:24px; font-weight:600; }
+  .day .dow { display:block; font-size:12px; color:var(--muted); }
+  .title { font-weight:600; }
+  .meta { font-size:14px; color:var(--muted); }
+  .slots { grid-column:2 / -1; display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .slot { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 10px 4px 12px;
+    font-size:13px; background:var(--wash); color:var(--muted); }
+  .slot.named { color:var(--ink); }
+  .slot .free { font:inherit; font-size:12px; border:0; background:transparent; color:var(--muted);
+    cursor:pointer; padding:0 2px; text-decoration:underline; }
+  .slot .free:hover { color:var(--err); }
+  .empty { color:var(--muted); padding:12px 0; }
+  #signin { padding:40px 0; text-align:center; }
+  #signin p { color:var(--muted); }
+  #gbtn { display:inline-block; margin-top:12px; }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <h1>Admin</h1>
+    <span id="who" class="who" hidden></span>
+  </div>
+
+  <section id="signin">
+    <p>Sign in with the owner's Google account to manage the schedule.</p>
+    <div id="gbtn"></div>
+    <div id="signinError" class="result err"></div>
+  </section>
+
+  <section id="app" hidden>
+    <h2>Import from calendar</h2>
+    <p class="hint">Pulls the months shown on the schedule from the venue's calendar. Existing events are never changed.</p>
+    <button class="btn primary" id="calBtn" type="button">Import from calendar</button>
+    <div id="calResult" class="result"></div>
+
+    <h2>Add events by hand</h2>
+    <p class="hint">Paste a JSON array. Events that already exist (same date and order) are left as they are.</p>
+    <textarea id="jsonInput" spellcheck="false" placeholder='[
+  { "date": "2026-10-03", "type": "DCM", "title": "DCM — Riverside" },
+  { "date": "2026-10-10", "type": "Class", "title": "Intro class", "order": 2 }
+]'></textarea>
+    <div style="margin-top:10px"><button class="btn primary" id="importBtn" type="button">Add events</button></div>
+    <div id="importResult" class="result"></div>
+
+    <h2>Upcoming events</h2>
+    <div id="events" class="empty">Loading…</div>
+  </section>
+</main>
+
+<script>
+  // The Apps Script deployment's /exec URL and your OAuth client ID.
+  const API_URL = 'PASTE_EXEC_URL_HERE';
+  const GOOGLE_CLIENT_ID = 'PASTE_CLIENT_ID_HERE';
+
+  const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MONTHS = ['January','February','March','April','May','June','July','August',
+                  'September','October','November','December'];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // --- Auth -----------------------------------------------------------------
+  let idToken = sessionStorage.getItem('idToken') || null;
+
+  function parseJwt(t) {
+    try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return null; }
+  }
+  function tokenValid(t) {
+    const p = t && parseJwt(t);
+    return p && p.exp * 1000 > Date.now() + 30000;
+  }
+
+  window.onGoogleLibraryLoad = () => {
+    google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: resp => { setToken(resp.credential); },
+      auto_select: true,
+    });
+    google.accounts.id.renderButton($('gbtn'), { theme: 'outline', size: 'large', text: 'signin_with' });
+    if (tokenValid(idToken)) showApp(); else showSignin();
+  };
+
+  function setToken(t) {
+    idToken = t;
+    sessionStorage.setItem('idToken', t);
+    $('signinError').textContent = '';
+    showApp();
+  }
+  function signOut() {
+    idToken = null;
+    sessionStorage.removeItem('idToken');
+    google.accounts.id.disableAutoSelect();
+    showSignin();
+  }
+  function showSignin() {
+    $('app').hidden = true; $('signin').hidden = false; $('who').hidden = true;
+  }
+  function showApp() {
+    const p = parseJwt(idToken) || {};
+    $('who').innerHTML = `${esc(p.email || '')} · <button class="btn link" id="signOutBtn" type="button">Sign out</button>`;
+    $('who').hidden = false;
+    $('signOutBtn').addEventListener('click', signOut);
+    $('signin').hidden = true; $('app').hidden = false;
+    load();
+  }
+
+  // --- API ------------------------------------------------------------------
+  async function api(body) {
+    if (!tokenValid(idToken)) { showSignin(); throw new Error('Sign in again.'); }
+    const r = await fetch(API_URL, { method: 'POST', redirect: 'follow',
+      body: JSON.stringify(Object.assign({ idToken }, body)) });
+    const data = await r.json();
+    if (data.error) {
+      if (/sign in|not the owner/i.test(data.error)) { $('signinError').textContent = data.error; signOut(); }
+      throw new Error(data.error);
+    }
+    return data;
+  }
+
+  // --- Rendering --------------------------------------------------------------
+  function dateParts(d) {
+    const [y, m, day] = d.split('-').map(Number);
+    return { num: day, dow: DOWS[new Date(y, m - 1, day).getDay()] };
+  }
+
+  function render(data) {
+    const el = $('events');
+    if (!data.events.length) { el.className = 'empty'; el.textContent = 'No upcoming events. Import or add some above.'; return; }
+    el.className = '';
+    let lastMonth = null;
+    el.innerHTML = data.events.map(ev => {
+      const p = dateParts(ev.date);
+      const claimInfo = ev.claimed ? `${ev.claimed}/${ev.slots} claimed` : `${ev.slots} slots`;
+      const ym = ev.date.slice(0, 7);
+      let header = '';
+      if (ym !== lastMonth) { lastMonth = ym; header = `<h3 class="month">${MONTHS[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}</h3>`; }
+      const slots = ev.available ? `<div class="slots">${ev.slotList.map(s => s.name
+          ? `<span class="slot named">${esc(s.name)} <button class="free" type="button" data-free="${esc(ev.id)}" data-slot="${s.index}" aria-label="Free slot ${s.index + 1}">free</button></span>`
+          : `<span class="slot">Open</span>`).join('')}</div>` : '';
+      return header + `
+        <div class="event${ev.available ? '' : ' off'}">
+          <div class="day"><span class="num">${p.num}</span><span class="dow">${p.dow}</span></div>
+          <div>
+            <div class="title">${esc(ev.title)}</div>
+            <div class="meta">${esc(ev.type)} · ${claimInfo}${ev.available ? '' : ' · not going'}</div>
+          </div>
+          <button class="btn small" type="button" data-id="${esc(ev.id)}" data-next="${ev.available ? 0 : 1}">
+            ${ev.available ? 'Mark not going' : 'Mark going'}
+          </button>
+          ${slots}
+        </div>`;
+    }).join('');
+  }
+
+  function load() {
+    api({ action: 'admin' }).then(render)
+      .catch(e => { $('events').className = 'empty'; $('events').textContent = e.message || 'Could not load events.'; });
+  }
+
+  function importResult(out, r) {
+    let msg = `Added ${r.added}, skipped ${r.skipped} already on the schedule.`;
+    const notes = [];
+    (r.unmatched || []).forEach(t => notes.push(`No type matched: ${esc(t)}`));
+    (r.errors || []).forEach(e => notes.push(esc(e)));
+    out.className = notes.length ? 'result err' : 'result';
+    out.innerHTML = msg + (notes.length ? '<ul>' + notes.map(x => `<li>${x}</li>`).join('') + '</ul>' : '');
+    if (r.events) render({ events: r.events });
+  }
+
+  $('events').addEventListener('click', e => {
+    const freeBtn = e.target.closest('button[data-free]');
+    if (freeBtn) {
+      const who = freeBtn.parentElement.textContent.replace(/\s*free\s*$/, '').trim();
+      if (!confirm(`Free the slot claimed by ${who}?`)) return;
+      freeBtn.disabled = true;
+      api({ action: 'free', eventId: freeBtn.dataset.free, slotIndex: +freeBtn.dataset.slot })
+        .then(render).catch(err => { freeBtn.disabled = false; alert(err.message); });
+      return;
+    }
+    const btn = e.target.closest('button[data-id]');
+    if (!btn) return;
+    btn.disabled = true;
+    api({ action: 'setAvailable', eventId: btn.dataset.id, available: btn.dataset.next === '1' })
+      .then(render).catch(err => { btn.disabled = false; alert(err.message); });
+  });
+
+  $('calBtn').addEventListener('click', () => {
+    const out = $('calResult');
+    out.className = 'result'; out.textContent = 'Importing…';
+    $('calBtn').disabled = true;
+    api({ action: 'calendarImport' })
+      .then(r => { $('calBtn').disabled = false; importResult(out, r); })
+      .catch(err => { $('calBtn').disabled = false; out.className = 'result err'; out.textContent = err.message; });
+  });
+
+  $('importBtn').addEventListener('click', () => {
+    const out = $('importResult');
+    let events;
+    try {
+      events = JSON.parse($('jsonInput').value);
+      if (!Array.isArray(events)) throw new Error('Expected a JSON array.');
+    } catch (err) { out.className = 'result err'; out.textContent = 'Could not read that JSON: ' + err.message; return; }
+    $('importBtn').disabled = true;
+    api({ action: 'import', events })
+      .then(r => { $('importBtn').disabled = false; importResult(out, r); if (r.added) $('jsonInput').value = ''; })
+      .catch(err => { $('importBtn').disabled = false; out.className = 'result err'; out.textContent = err.message; });
+  });
+</script>
+</body>
+</html>
