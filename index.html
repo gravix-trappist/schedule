@@ -120,9 +120,10 @@
   const dialog = $('claimDialog');
   let pending = null;
 
-  // Give up on a single attempt after this long; the schedule load retries.
-  const TIMEOUT_MS = 6000;
-  const LOAD_ATTEMPTS = 3;
+  // Give up on a single attempt after this long; the schedule load retries once.
+  // Apps Script cold starts can take several seconds, so keep this generous.
+  const TIMEOUT_MS = 12000;
+  const LOAD_ATTEMPTS = 2;
 
   async function fetchWithTimeout(url, opts, ms) {
     const ctrl = new AbortController();
@@ -149,9 +150,14 @@
       try { return await api(); }
       catch (err) {
         lastErr = err;
-        if (i < LOAD_ATTEMPTS - 1) await new Promise(r => setTimeout(r, 500 * (i + 1)));
+        // Only retry timeouts and network failures; a server-side error won't
+        // change on a retry.
+        const transient = err.name === 'AbortError' || err.name === 'TypeError';
+        if (!transient || i === LOAD_ATTEMPTS - 1) break;
+        await new Promise(r => setTimeout(r, 750));
       }
     }
+    console.error('Schedule load failed:', lastErr);
     throw lastErr;
   }
 
