@@ -83,10 +83,9 @@
   </section>
 </main>
 
+<script src="config.js"></script>
 <script>
-  // The Apps Script deployment's /exec URL and your OAuth client ID.
-  const API_URL = 'PASTE_EXEC_URL_HERE';
-  const GOOGLE_CLIENT_ID = 'PASTE_CLIENT_ID_HERE';
+  const { API_URL, GOOGLE_CLIENT_ID } = window.SCHEDULER_CONFIG || {};
 
   const DOWS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const MONTHS = ['January','February','March','April','May','June','July','August',
