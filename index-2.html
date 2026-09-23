@@ -51,13 +51,35 @@
   .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: #fff;
     padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   .toast.show { opacity: 1; }
+
+  /* Skeleton placeholders shown until the schedule arrives */
+  .sk { background: linear-gradient(90deg, #eceef1 25%, #f6f7f9 50%, #eceef1 75%);
+    background-size: 200% 100%; animation: shimmer 1.2s ease-in-out infinite; border-radius: 6px; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .sk-day { width: 30px; height: 26px; margin: 0 auto 4px; }
+  .sk-dow { width: 24px; height: 10px; margin: 0 auto; }
+  .sk-title { width: 55%; height: 15px; margin-bottom: 8px; }
+  .sk-type { width: 30%; height: 12px; margin-bottom: 10px; }
+  .sk-slot { width: 62px; height: 30px; border-radius: 999px; }
+  /* Entrance animations */
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  main > h1, main > .intro { animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  main > .intro { animation-delay: .08s; }
+  #schedule > h2 { animation: fadein .35s ease both; }
+  #schedule > .event { animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  /* Each row starts a little after the previous one; --i is set in JS. */
+  #schedule > * { animation-delay: calc(.12s + var(--i, 0) * 45ms); }
+  .stale { color: var(--muted); font-size: 12px; margin-top: -16px; margin-bottom: 16px; min-height: 1.2em; }
+  @media (prefers-reduced-motion: reduce) { .sk, main > h1, main > .intro, #schedule > * { animation: none; } }
 </style>
 </head>
 <body>
 <main>
   <h1>Availability</h1>
   <p class="intro">Tap an open slot to claim it. You'll be asked for your name.</p>
-  <div id="schedule" class="empty">Loading…</div>
+  <div id="status" class="stale"></div>
+  <div id="schedule"></div>
 </main>
 
 <dialog id="claimDialog">
@@ -132,10 +154,75 @@
     const el = $('schedule');
     el.className = '';
     el.innerHTML = html;
+    stagger(el);
+  }
+
+  // Give each heading/row an index so the CSS can stagger the fly-in (capped so
+  // long lists don't take forever to settle).
+  function stagger(el) {
+    Array.from(el.children).forEach((c, i) => c.style.setProperty('--i', Math.min(i, 12)));
   }
 
   function showError(msg) { $('schedule').className = 'empty'; $('schedule').textContent = msg; }
-  function load() { api().then(render).catch(() => showError('Could not load the schedule. Refresh to try again.')); }
+
+  // --- Perceived speed: skeleton + last-known snapshot ------------------------
+  const SNAP_KEY = 'schedule-snapshot';
+  const MONTHS_GUESS = 4; // only for the skeleton; real months come from the server
+
+  function skeleton() {
+    const now = new Date();
+    let html = '';
+    for (let i = 0; i < MONTHS_GUESS; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      html += `<h2>${MONTHS[d.getMonth()]} ${d.getFullYear()}</h2>`;
+      for (let r = 0; r < (i === 0 ? 2 : 1); r++) {
+        html += `
+          <div class="event" aria-hidden="true">
+            <div class="day"><div class="sk sk-day"></div><div class="sk sk-dow"></div></div>
+            <div>
+              <div class="sk sk-title"></div>
+              <div class="sk sk-type"></div>
+              <div class="slots"><div class="sk sk-slot"></div><div class="sk sk-slot"></div></div>
+            </div>
+          </div>`;
+      }
+    }
+    $('schedule').innerHTML = html;
+    stagger($('schedule'));
+  }
+
+  function readSnapshot() {
+    try {
+      const raw = localStorage.getItem(SNAP_KEY);
+      if (!raw) return null;
+      const snap = JSON.parse(raw);
+      // Ignore anything older than a week; it would mostly be past events.
+      return (Date.now() - snap.at < 7 * 864e5) ? snap.data : null;
+    } catch (e) { return null; }
+  }
+  function writeSnapshot(data) {
+    try { localStorage.setItem(SNAP_KEY, JSON.stringify({ at: Date.now(), data })); } catch (e) {}
+  }
+
+  function renderFresh(data) {
+    writeSnapshot(data);
+    render(data);
+    $('status').textContent = '';
+  }
+
+  function load() {
+    api().then(renderFresh).catch(() => {
+      if (readSnapshot()) $('status').textContent = "Couldn't refresh — showing the last known schedule.";
+      else showError('Could not load the schedule. Refresh to try again.');
+    });
+  }
+
+  function boot() {
+    const snap = readSnapshot();
+    if (snap) { render(snap); $('status').textContent = 'Updating…'; }
+    else skeleton();
+    load();
+  }
   function toast(msg) {
     const t = $('toast'); t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
@@ -160,7 +247,7 @@
     $('claimBtn').disabled = true;
     $('claimError').textContent = '';
     api({ action: 'claim', eventId: pending.eventId, slotIndex: pending.slotIndex, name })
-      .then(data => { dialog.close(); render(data); toast('Slot claimed'); })
+      .then(data => { dialog.close(); renderFresh(data); toast('Slot claimed'); })
       .catch(err => {
         $('claimBtn').disabled = false;
         $('claimError').textContent = err.message || 'Could not claim that slot.';
@@ -168,7 +255,7 @@
       });
   });
 
-  load();
+  boot();
 </script>
 </body>
 </html>
