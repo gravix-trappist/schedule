@@ -72,9 +72,9 @@
 </dialog>
 <div id="toast" class="toast"></div>
 
+<script src="config.js"></script>
 <script>
-  // The Apps Script deployment's /exec URL.
-  const API_URL = 'PASTE_EXEC_URL_HERE';
+  const { API_URL } = window.SCHEDULER_CONFIG || {};
 
   const MONTHS = ['January','February','March','April','May','June','July','August',
                   'September','October','November','December'];
