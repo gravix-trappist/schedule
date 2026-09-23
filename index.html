@@ -32,6 +32,7 @@
   .slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   .slot { border-radius: 999px; padding: 7px 14px; font-size: 14px; border: 1.5px solid transparent;
     font-family: inherit; line-height: 1.2; }
+  .slot b { font-weight: 600; }
   button.slot.open { background: var(--open-soft); border-color: var(--open); color: var(--open); cursor: pointer; }
   button.slot.open:hover, button.slot.open:focus-visible { background: var(--open); color: #fff; outline: none; }
   .slot.taken { background: var(--taken); color: var(--muted); }
@@ -191,8 +192,8 @@
         const slots = !ev.available
           ? '<div class="not-going">Not going</div>'
           : '<div class="slots">' + ev.slots.map(s => s.claimed
-              ? `<span class="slot taken">Claimed</span>`
-              : `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}">Open</button>`
+              ? `<span class="slot taken"><b>Slot ${s.index + 1}</b> · Claimed</span>`
+              : `<button class="slot open" type="button" data-event="${esc(ev.id)}" data-slot="${s.index}" aria-label="Claim slot ${s.index + 1} for ${esc(ev.title)}"><b>Slot ${s.index + 1}</b> · Open</button>`
             ).join('') + '</div>';
         html += `
           <div class="event${sameDay ? ' same-day' : ''}" style="--i:${mi};--j:${Math.min(ei, 8)}">
@@ -284,7 +285,7 @@
     if (!btn) return;
     pending = { eventId: btn.dataset.event, slotIndex: +btn.dataset.slot };
     const ev = btn.closest('.event');
-    $('claimCtx').textContent = ev.querySelector('.title').textContent + ' — slot ' + (pending.slotIndex + 1);
+    $('claimCtx').textContent = ev.querySelector('.title').textContent + ' — Slot ' + (pending.slotIndex + 1);
     $('claimError').textContent = '';
     $('claimBtn').disabled = false;
     $('claimBtn').classList.remove('busy');
