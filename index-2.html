@@ -322,4 +322,12 @@
         $('claimBtn').classList.remove('busy');
         $('claimError').textContent = err.name === 'AbortError'
           ? 'That took too long. Check the schedule and try again if the slot is still open.'
-          : (err.message || 'Could not
+          : (err.message || 'Could not claim that slot.');
+        load();
+      });
+  });
+
+  boot();
+</script>
+</body>
+</html>
